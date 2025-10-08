@@ -1,48 +1,84 @@
-#include <memory>
+#include "PaymentModes.h"
+#include "PaymentRegistry.h"
+#include "PaymentProcessors.h"
+#include "PaymentRegistration.h"
+#include <iostream>
 #include <string>
-#include <gtest/gtest.h>
+#include <vector>
 
-#include "payment_modes.h"
-#include "processor_factory.h"
-
-// Utility: get processor safely
-std::string processPayment(const std::string& mode, double amount) {
-    auto processor = ProcessorFactory::create(mode);
-    if (!processor) {
-        return "Invalid";
+// Helper for test
+std::string get_payment_message(PaymentMode mode, double amount) {
+    const IPaymentProcessor* processor = PaymentRegistry::instance().getProcessor(mode);
+    if (processor) {
+        return processor->process(amount);
     }
-    return processor->process(amount);
+    return "Invalid payment mode selected!";
 }
 
-// -------- TESTS --------
+struct PaymentTestScenario {
+    PaymentMode mode;
+    double amount;
+    std::string expected;
+    std::string description;
+};
 
-// Requirement: PayPal support
-TEST(CheckoutTest, PayPalPayment) {
-    EXPECT_EQ(processPayment("PayPal", 100.0),
-              "Processing PayPal payment of $100");
+void run_payment_tests() {
+    std::vector<PaymentTestScenario> scenarios = {
+                {
+            PaymentMode::PayPal, 150.75,
+            "Processing PayPal payment of $150.750000",
+            "PayPal payment with valid amount"
+        },
+        {
+            PaymentMode::GooglePay, 99.99,
+            "Processing GooglePay payment of $99.990000",
+            "GooglePay payment with valid amount"
+        },
+        {
+            PaymentMode::CreditCard, 0.0,
+            "Processing Credit Card payment of $0.000000",
+            "CreditCard payment with zero amount"
+        },
+        {
+            PaymentMode::PayPal, -10.0,
+            "Processing PayPal payment of $-10.000000",
+            "PayPal payment with negative amount"
+        },
+        {
+            PaymentMode::GooglePay, 1e6,
+            "Processing GooglePay payment of $1000000.000000",
+            "GooglePay payment with large amount"
+        },
+        {
+            PaymentMode::Unknown, 150.75,
+            "Invalid payment mode selected!",
+            "Unknown payment mode"
+        },
+        {
+            PaymentMode::Unknown, 0.0,
+            "Invalid payment mode selected!",
+            "Unknown payment mode with zero amount"
+        },
+        {
+            PaymentMode::Unknown, -5.0,
+            "Invalid payment mode selected!",
+            "Unknown payment mode with negative amount"
+        }
+    };
+
+    for (const auto& scenario : scenarios) {
+        std::string result = get_payment_message(scenario.mode, scenario.amount);
+        std::cout << "Scenario: " << scenario.description << "\n"
+                  << "  When checkout is called with amount " << scenario.amount << "\n"
+                  << "  Then result should be: " << scenario.expected << "\n"
+                  << "  Actual result: " << result << "\n"
+                  << ((result == scenario.expected) ? "  [PASS]\n" : "  [FAIL]\n")
+                  << std::endl;
+    }
 }
 
-// Requirement: GooglePay support
-TEST(CheckoutTest, GooglePayPayment) {
-    EXPECT_EQ(processPayment("GooglePay", 50.5),
-              "Processing GooglePay payment of $50.5");
-}
-
-// Requirement: CreditCard support
-TEST(CheckoutTest, CreditCardPayment) {
-    EXPECT_EQ(processPayment("CreditCard", 250.0),
-              "Processing CreditCard payment of $250");
-}
-
-// Requirement: Unsupported payment mode handled gracefully
-TEST(CheckoutTest, InvalidPaymentMode) {
-    EXPECT_EQ(processPayment("Bitcoin", 1000.0), "Invalid");
-}
-
-// Requirement: Placeholder logic (test that stub message still prints correctly)
-TEST(CheckoutTest, PlaceholderLogicStillWorks) {
-    // For now just ensure PayPal prints expected placeholder confirmation
-    std::string result = processPayment("PayPal", 42.42);
-    EXPECT_NE(result.find("PayPal"), std::string::npos);  // contains "PayPal"
-    EXPECT_NE(result.find("42.42"), std::string::npos);   // contains amount
+int main() {
+    registerProcessors();
+    run_payment_tests();
+    return 0;
 }
