@@ -1,12 +1,14 @@
 #pragma once
-#include <string>
+#include "PaymentRegistry.h"
+#include "PaymentProcessors.h"
 #include <memory>
-#include <unordered_map>
-#include <functional>
 
-// Abstract base class
-class PaymentProcessor {
- public:
-    virtual ~PaymentProcessor() = default;
-    virtual std::string process(double amount) const = 0;
-};
+// Registers all payment processors with the registry
+inline void registerProcessors() {
+    PaymentRegistry::instance().registerProcessor(
+        PaymentMode::PayPal, std::make_unique<PayPalProcessor>());
+    PaymentRegistry::instance().registerProcessor(
+        PaymentMode::GooglePay, std::make_unique<GooglePayProcessor>());
+    PaymentRegistry::instance().registerProcessor(
+        PaymentMode::CreditCard, std::make_unique<CreditCardProcessor>());
+}
